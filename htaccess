@@ -1,0 +1,49 @@
+# =============================================================
+# .htaccess — Sécurité Système de Pointage (MQTT)
+# =============================================================
+
+# ── Bloquer accès aux fichiers sensibles ─────────────────────
+<FilesMatch "\.(db|log|sh|env|bak|sql|ini|ddl|lock)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# ── Bloquer accès direct aux dossiers critiques ───────────────
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^logs/    - [F,L]
+    RewriteRule ^backups/ - [F,L]
+
+    # sync_esp32.php : accessible uniquement en CLI ou depuis localhost
+    RewriteCond %{REMOTE_ADDR} !^127\.0\.0\.1$
+    RewriteCond %{HTTP_HOST}   !^localhost
+    RewriteRule ^sync_esp32\.php$ - [F,L]
+
+    # cron_sync.sh : jamais accessible en HTTP
+    RewriteRule ^cron_sync\.sh$ - [F,L]
+</IfModule>
+
+# ── Désactiver listing des répertoires ────────────────────────
+Options -Indexes
+
+# ── Headers de sécurité ───────────────────────────────────────
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header unset X-Powered-By
+
+    # Content Security Policy : autoriser WebSocket MQTT (ws://)
+    # Adapter MQTT_HOST à ton adresse si différente de 127.0.0.1
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com unpkg.com; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com; connect-src 'self' ws://127.0.0.1:9001 ws://localhost:9001; font-src 'self' cdnjs.cloudflare.com"
+</IfModule>
+
+# ── Cache assets statiques ────────────────────────────────────
+<FilesMatch "\.(css|js|png|jpg|ico|woff2)$">
+    Header set Cache-Control "max-age=604800, public"
+</FilesMatch>
+
+# ── Pas de cache sur les pages PHP ────────────────────────────
+<FilesMatch "\.php$">
+    Header set Cache-Control "no-store, no-cache, must-revalidate"
+</FilesMatch>
